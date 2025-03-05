@@ -14,7 +14,6 @@ use EXB\Kernel\Document\Event\DocumentEvent;
 use EXB\Kernel\Document\Factory;
 use EXB\Kernel\Document\Model\SaveHandler\Event\SaveEvent;
 use EXB\Kernel\Document\Model\SaveHandler\SaveHandlerEvents;
-use EXB\Kernel\Document\Model\SavePayload;
 use EXB\R4\Config;
 
 class DhmoPcdaWorkflow extends AbstractPlugin
@@ -42,7 +41,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	{
 		return [
 			DocumentEvents::DOCUMENT_PRE_SHOW	=> ['onDocumentShow', 0],
-			DocumentEvents::DOCUMENT_PRE_DELETE		=> ['onDelete', 0],
+			DocumentEvents::DOCUMENT_PRE_DELETE	=> ['onDelete', 0],
 			SaveHandlerEvents::SAVE				=> ['onSave', 0],
 		];
 	}
@@ -87,6 +86,9 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		// Defines if the incident is new or updating
 		$is_new = $data->getParam('savehandler_request.itemid') == '-1';
 
+		Kernel::getLogger()->addNotice(
+			self::$configBase . ': Get new save request, is it new? ' . $is_new ? 'YES' : 'NO' );
+
 		// Procedure table id
 		$procedureTableId = Config::get(self::$configBase . '.procedure_tableid', 'table_62');
 
@@ -95,7 +97,9 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 			'trim', explode(',', Config::get(self::$configBase . '.categoryId', '91,92')));
 
 		// check if we're interested in this category
-		if (in_array($categoryId, $targetCategories) == false) return;
+		if (in_array($categoryId, $targetCategories) == false) {
+			Kernel::getLogger()->addNotice(self::$configBase . ': We\'re not interested in categoryId ' .$categoryId);
+		}
 
 		// Get station
 		$stationField = $document->getModel()->getFieldByAlias('station');
