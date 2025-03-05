@@ -3,6 +3,7 @@
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
 use EXB\IM\Bridge\Category;
+use EXB\IM\Bridge\Documents\Incident;
 use EXB\IM\Bridge\Modules;
 use EXB\Kernel;
 use EXB\Kernel\Database;
@@ -149,25 +150,25 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		$sql = $db->select()->from('cim_variabele_velden', ['id'])
 				   ->where('alias = ?', 'qalias')
 				   ->where('onderdeel_id = ?', $procedureTableId);
-		// This is the id of the fielw which selects the id of the field of the incident
+
+		// This is the id of the field which selects the id of the field of the incident
 		$procedureFieldId = $db->fetchOne($sql);
 
 		// Generate actionplan
 		$actionPlan = [];
 		foreach ($fields as $field) {
+			// Get the id of the procedure
+			$sql = $db->select()->from('cim_variabele_velden_entries', ['procedureId' => 'klacht_id'])
+				->where('veld_id = ?', $procedureFieldId)
+				->where('waarde = ?',  $field['id']);
+			$procedureId = $db->fetchOne($sql);
+			$details = $this->getProcedureDetails($is_stations_manned, $procedureId);
+
 			if ($is_new) { // We're new, create new tasks ony
 				if ($field['enabled'] == false) continue;
 
 				// No need to create any action
 				if ($field['is_negative'] == false) continue;
-
-				// Get the id of the procedure
-				$sql = $db->select()->from('cim_variabele_velden_entries', ['procedureId' => 'klacht_id'])
-					->where('veld_id = ?', $procedureFieldId)
-					->where('waarde = ?',  $field['id']);
-				$procedureId = $db->fetchOne($sql);
-
-				$details = $this->getProcedureDetails($is_stations_manned, $procedureId);
 
 				$actionPlan[] = [
 					'reference' => $document,
@@ -176,7 +177,25 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 					'value' => $details
 				];
 			} else { // Update an existing, check the previous
-
+				$tasks = $document->getReferencesByClassname(Incident::class, Kernel\Document\Reference\Reference::DIRECTION_BOTH, $field['id']);
+				if (sizeof($tasks) == 0 && $field['is_negative']) {
+					// Create new task
+					$actionPlan[] = [
+						'reference' => $document,
+						'field' => $document->getModel()->getField($field['id']),
+						'action' => self::ACTION_CREATE_TASK,
+						'value' => $details
+					];
+				} else {
+					// Remove task because answer if not negative
+					if ($field['is_negative'] == false) {
+						$actionPlan[] = [
+							'reference' => $tasks[0],
+							'field' => $document->getModel()->getField($field['id']),
+							'action' => self::ACTION_REMOVE_TASK,
+						];
+					}
+				}
 			}
 		}
 
@@ -246,9 +265,6 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 					// Add reference between the parent document and the source (question) of the reference
 					$task->addReference($plan['reference'], $plan['field']->getId());
 
-					$payload = new SavePayload;
-					$payload->addParam('categoryId', $category->getId());
-
 					$values = [
 						[$task->getModel()->getFieldByAlias('qid')->getId(), $plan['field']->getId()],
 						[$task->getModel()->getFieldByAlias('TaskCat')->getId(), $plan['value']['TaskCat']],
@@ -281,7 +297,10 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 				}
 
 				case self::ACTION_REMOVE_TASK: {
+					/** @var Incident $reference */
+					$reference = $plan['reference'];
 
+					$reference->delete();
 				}
 			}
 		}
