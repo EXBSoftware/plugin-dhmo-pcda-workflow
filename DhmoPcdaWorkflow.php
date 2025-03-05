@@ -2,7 +2,6 @@
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
-use EXB\IM\Bridge\Category;
 use EXB\IM\Bridge\Documents\Incident;
 use EXB\IM\Bridge\Modules;
 use EXB\Kernel;
@@ -133,7 +132,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 				return array_merge($row, [
 					'id' => $fieldId,
-					'enabled' => $params['action'] == 'true',
+					'enabled' => trim($params['mandatory_on']) != '',
 					'is_negative' => $value == $params['mandatory_on'],
 					'value' => $value
 				]);
