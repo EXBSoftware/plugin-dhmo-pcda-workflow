@@ -2,6 +2,8 @@
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
+use EXB\IM\Bridge\Document\Event\Incident\IncidentCreatedEvent;
+use EXB\IM\Bridge\Document\IncidentEvents;
 use EXB\IM\Bridge\Documents\Incident;
 use EXB\IM\Bridge\Modules;
 use EXB\Kernel;
@@ -41,7 +43,8 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		return [
 			DocumentEvents::DOCUMENT_PRE_SHOW	=> ['onDocumentShow', 0],
 			DocumentEvents::DOCUMENT_PRE_DELETE	=> ['onDelete', 0],
-			SaveHandlerEvents::SAVE				=> ['onSave', 0],
+			//SaveHandlerEvents::SAVE				=> ['onSave', 0],
+			IncidentEvents::INCIDENT_CREATED => ['onSave', 0]
 		];
 	}
 
@@ -73,20 +76,24 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		}
 	}
 
-	public function onSave(SaveEvent $event) {
+	public function onSave(IncidentCreatedEvent $event) {
 		$db = Database::getInstance();
-		$document = $event->getDocument();
-		$data = $event->getPayload();
+		$document = $event->getIncident();
+
+		$data = $event->getData();
 
 		if ($document->getModule()->getId() != Modules::MODULE_INCIDENT) {
 			return;
 		}
 
+		// Without cache
+		$document = Factory::fetch(Modules::MODULE_INCIDENT, $event->getIncident()->getId(), false);
+
 		// Defines if the incident is new or updating
 		$is_new = $data->getParam('savehandler_request.itemid') == '-1';
 
 		Kernel::getLogger()->addNotice(
-			self::$configBase . ': Get new save request, is it new? ' . $is_new ? 'YES' : 'NO' );
+			self::$configBase . ': Get new save request, is it new? ' . $is_new ? ('YES (id:' . $document->getId().')') : 'NO' );
 
 		// Procedure table id
 		$procedureTableId = Config::get(self::$configBase . '.procedure_tableid', 'table_62');
