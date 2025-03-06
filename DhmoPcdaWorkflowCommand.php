@@ -38,10 +38,6 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         $is_new = $message['is_new'];
         $data = $message['data'];
 
-        CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
-            'event' => $is_new ? DhmoPcdaWorkflowEvents::DOCUMENT_CREATED : DhmoPcdaWorkflowEvents::DOCUMENT_UPDATE,
-            'itemId' => $document->getId()
-        ]);
 
         $this->onSave($document, $is_new, $data);
     }
@@ -63,6 +59,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         if (in_array($categoryId, DhmoPcdaWorkflow::getTargetCategories()) == false) {
             Kernel::getLogger()->addNotice(self::$configBase . ': We\'re not interested in categoryId ' . $categoryId);
         }
+
 
         // Get station
         $stationField = $document->getModel()->getFieldByAlias('station');
@@ -172,6 +169,12 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         }
 
         $this->executeActionPlan($actionPlan);
+
+        // Inform
+        CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
+            'event' => $is_new ? DhmoPcdaWorkflowEvents::DOCUMENT_CREATED : DhmoPcdaWorkflowEvents::DOCUMENT_UPDATE,
+            'itemId' => $document->getId()
+        ]);
     }
 
     private function getProcedureDetails($is_manned, $procedureId)
@@ -216,7 +219,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         $db = Database::getInstance();
 
         // The category id when creating new tasks
-        $taskCategoryId = Config::get(self::$configBase . '.taskCategory', 112);
+        $taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
 
         // Procedure table id
         $procedureTableId = Config::get(self::$configBase . '.procedure_tableid', 'table_62');

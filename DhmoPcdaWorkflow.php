@@ -35,7 +35,8 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	{
 		return [
 			DocumentEvents::DOCUMENT_PRE_DELETE	=> ['onDelete', 0],
-			'mobile_document_created' => ['onSave', 0]
+			DocumentEvents::DOCUMENT_PRE_SAVE	=> ['onSave', 0],
+			'mobile_document_created' => ['onMobileSave', 0]
 		];
 	}
 
@@ -45,6 +46,14 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	static function getTargetCategories()
 	{
 		return array_map('trim', explode(',', Config::get(static::$configBase . '.categoryId', '91,92')));
+	}
+
+	/**
+	 * @return int the category id
+	 */
+	static function getTaskCategoryId()
+	{
+		return Config::get(static::$configBase . '.taskCategory', 112);
 	}
 
 	public function onDelete(DocumentEvent $event)
@@ -79,7 +88,25 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		}
 	}
 
-	public function onSave(SaveEvent $event)
+	public function onSave(DocumentEvent $event)
+	{
+		$document = $event->getDocument();
+
+		if ($document->getModule()->getId() != Modules::MODULE_INCIDENT) {
+			return;
+		}
+
+		if ($document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()) {
+			if ($document->exists()) {
+				CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
+					'event' => DhmoPcdaWorkflowEvents::TASK_UPDATE,
+					'itemId' => $document->getId()
+				]);
+			}
+		}
+	}
+
+	public function onMobileSave(SaveEvent $event)
 	{
 		$document = $event->getDocument();
 		$data = $event->getPayload();
@@ -94,10 +121,12 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 			$document->save();
 		}
 
+		$is_new = $data->getParam('savehandler_request.itemid') == '-1';
+
 		// Run task
 		CommandQueue::do(DhmoPcdaWorkflowCommand::class, [
 			'itemId' => $document->getId(),
-			'is_new' => $data->getParam('savehandler_request.itemid') == '-1',
+			'is_new' => $is_new,
 			'data' => $data->getFields()
 		]);
 	}
