@@ -38,10 +38,10 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         $is_new = $message['is_new'];
         $data = $message['data'];
 
-		CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
-			'event' => $is_new ? DhmoPcdaWorkflowEvents::DOCUMENT_CREATED : DhmoPcdaWorkflowEvents::DOCUMENT_UPDATE,
-			'itemId' => $document->getId()
-		]);
+        CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
+            'event' => $is_new ? DhmoPcdaWorkflowEvents::DOCUMENT_CREATED : DhmoPcdaWorkflowEvents::DOCUMENT_UPDATE,
+            'itemId' => $document->getId()
+        ]);
 
         $this->onSave($document, $is_new, $data);
     }
@@ -58,13 +58,9 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         $procedureTableId = Config::get(self::$configBase . '.procedure_tableid', 'table_62');
 
         $categoryId = $document->getCategory()->getId();
-        $targetCategories = array_map(
-            'trim',
-            explode(',', Config::get(self::$configBase . '.categoryId', '91,92'))
-        );
 
         // check if we're interested in this category
-        if (in_array($categoryId, $targetCategories) == false) {
+        if (in_array($categoryId, DhmoPcdaWorkflow::getTargetCategories()) == false) {
             Kernel::getLogger()->addNotice(self::$configBase . ': We\'re not interested in categoryId ' . $categoryId);
         }
 
@@ -280,21 +276,21 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 // Force direct index
                 $task->performIndex();
 
-				CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
-					'event' =>DhmoPcdaWorkflowEvents::TASK_CREATED,
-					'itemId' => $task->getId()
-				]);
+                CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
+                    'event' => DhmoPcdaWorkflowEvents::TASK_CREATED,
+                    'itemId' => $task->getId()
+                ]);
 
                 break;
             } else if ($plan['action'] == self::ACTION_REMOVE_TASK) {
                 /** @var Incident $reference */
                 $reference = $plan['reference'];
 
-				// Delete should be performed synchronously
-				CommandQueue::execute(DhmoPcdaWorkflowEventCommand::class, [
-					'event' =>DhmoPcdaWorkflowEvents::TASK_DELETED,
-					'itemId' => $reference->getId()
-				]);
+                // Delete should be performed synchronously
+                CommandQueue::execute(DhmoPcdaWorkflowEventCommand::class, [
+                    'event' => DhmoPcdaWorkflowEvents::TASK_DELETED,
+                    'itemId' => $reference->getId()
+                ]);
 
                 $reference->delete();
                 break;
