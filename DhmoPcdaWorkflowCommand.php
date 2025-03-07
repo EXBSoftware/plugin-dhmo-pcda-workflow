@@ -23,6 +23,8 @@ use EXB\Kernel\Document\Factory;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\Kernel\Queue\Command\CommandQueue;
 use EXB\R4\Config;
+use EXB\Kernel\Plugin\PluginManager;
+use EXB\Kernel\Document\Model\ModelAbstract;
 
 class DhmoPcdaWorkflowCommand extends AbstractCommand
 {
@@ -33,7 +35,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
 
     public function process(array $message)
     {
-        $document = Factory::fetch(Modules::MODULE_INCIDENT, $message['itemId']);
+        $document = Factory::fetch(Modules::MODULE_INCIDENT, $message['itemId'], false);
         $is_new = $message['is_new'];
         $data = $message['data'];
 
@@ -215,6 +217,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
     // Execute the action plan to create/delete tasks
     private function executeActionPlan($actionPlan)
     {
+        PluginManager::getPlugin('mobile')->disable();
         $db = Database::getInstance();
 
         // The category id when creating new tasks
@@ -226,24 +229,34 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         /** @var \EXB\IM\Bridge\Category $category **/
         $category = \EXB\IM\Bridge\Category::getInstance($taskCategoryId);
 
-        foreach ($actionPlan as $plan) {
+
+        \EXB\Kernel::getLogger()->addInfo('Performing actionplan with count', [sizeof($actionPlan)]);
+
+        foreach ($actionPlan as $index=>$plan) {
+
             if ($plan['action'] == self::ACTION_CREATE_TASK) {
                 /**
                  * Create the task and set the category
                  * @var \EXB\IM\Bridge\Documents\Incident $task
                  */
                 $task = Factory::create(Modules::MODULE_INCIDENT);
+                $task->getModel()->disableFeature(ModelAbstract::FEATURE_ROUTING);
+                $task->getModel()->disableFeature(ModelAbstract::FEATURE_SORT);
+                $task->getModel()->disableFeature(ModelAbstract::FEATURE_SECURITYLEVEL);
+                $task->getModel()->disableFeature(ModelAbstract::FEATURE_FIXEDFIELDPROPERTIES);
+
                 $task->setCategory($category);
                 $task->setName($plan['value']['Task']);
                 $task->save();
+
+
+                // Add reference between the parent document and the source (question) of the reference
+                $task->addReference($plan['reference'], $plan['field']->getId());
 
                 // Meta data
                 Number::allocate($task);
                 $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
                 $task->save();
-
-                // Add reference between the parent document and the source (question) of the reference
-                $task->addReference($plan['reference'], $plan['field']->getId());
 
                 // Connect the category to the task
                 // TODO add category field to the task model
@@ -287,8 +300,6 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                     'event' => DhmoPcdaWorkflowEvents::TASK_CREATED,
                     'itemId' => $task->getId()
                 ]);
-
-                break;
             } else if ($plan['action'] == self::ACTION_REMOVE_TASK) {
                 /** @var Incident $reference */
                 $reference = $plan['reference'];
@@ -300,8 +311,9 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 ]);
 
                 $reference->delete();
-                break;
             }
         }
+
+        PluginManager::getPlugin('mobile')->enable();
     }
 }

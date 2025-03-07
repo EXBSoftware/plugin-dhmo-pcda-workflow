@@ -61,6 +61,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 				if (sizeof($refs) == 0) {
 					Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Could not determine main incident for task', ['itemId' => $document->getId()]);
+					return;
 				}
 
 				/** @var Incident $main */
