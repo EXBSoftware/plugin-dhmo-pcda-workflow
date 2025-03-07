@@ -16,6 +16,7 @@ namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
 use EXB\IM\Bridge\Documents\Incident;
 use EXB\IM\Bridge\Modules;
+use EXB\IM\Bridge\Number;
 use EXB\Kernel;
 use EXB\Kernel\Database;
 use EXB\Kernel\Document\Factory;
@@ -234,6 +235,11 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $task = Factory::create(Modules::MODULE_INCIDENT);
                 $task->setCategory($category);
                 $task->setName($plan['value']['Task']);
+                $task->save();
+
+                // Meta data
+                Number::allocate($task);
+                $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
                 $task->save();
 
                 // Add reference between the parent document and the source (question) of the reference
