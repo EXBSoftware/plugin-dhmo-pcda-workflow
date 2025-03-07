@@ -79,7 +79,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 				}
 
 				if ($uncompletedCount == 0) {
-					$categoryTemplateIds = [91 => 17,92 => 18]; // 91 = HACCP, 92 = Kwaliteit
+					$categoryTemplateIds = [
+						91 => 17,
+						92 => 18
+					]; // 91 = HACCP, 92 = Kwaliteit
 					$templateId = $categoryTemplateIds[$document->getCategory()->getId()];
 					$template = new Template($main, $templateId);
 
