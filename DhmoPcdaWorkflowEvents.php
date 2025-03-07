@@ -1,5 +1,4 @@
 <?php
-
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
@@ -11,7 +10,6 @@
  *
  * @author Emiel van Goor <e.goor@exb-software.com>
  */
-
 declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;

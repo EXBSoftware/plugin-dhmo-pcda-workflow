@@ -1,4 +1,16 @@
 <?php
+/**
+ * EXB R5 - Business suite
+ * Copyright (C) EXB Software 2025 - All Rights Reserved
+ *
+ * This file is part of EXB Software Platform.
+ *
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ *
+ * @author Emiel van Goor <e.goor@exb-software.com>
+ */
+declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
