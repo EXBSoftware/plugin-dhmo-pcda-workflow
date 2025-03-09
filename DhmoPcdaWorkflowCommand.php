@@ -258,6 +258,9 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
                 $task->save();
 
+                // Add reference between the parent document and the source (question) of the reference
+                $task->addReference($plan['reference']);
+
                 // Connect the category to the task
                 // TODO add category field to the task model
                 $categoryDocument = Factory::fetch(
@@ -269,7 +272,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $values = [
                     [$task->getModel()->getFieldByAlias('qid')->getId(), $plan['field']->getId()],
                     [$task->getModel()->getFieldByAlias('TaskCat')->getId(), $plan['value']['TaskCat']],
-                    [$task->getModel()->getFieldByAlias('responsible')->getId(), $plan['value']['Role']],
+                    [$task->getModel()->getFieldByAlias('Role')->getId(), $plan['value']['Role']],
                     [$task->getModel()->getFieldByAlias('Inform')->getId(), $plan['value']['Inform']],
                 ];
 

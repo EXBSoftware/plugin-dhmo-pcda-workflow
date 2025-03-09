@@ -14,8 +14,21 @@ declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
+use EXB\Http\Request;
+use EXB\IM\Bridge\Documents\Incident;
+use EXB\IM\Bridge\Mailbox\Event\MailEvent;
+use EXB\IM\Bridge\Mailbox\MailboxEvents;
 use EXB\IM\Bridge\Modules;
+use EXB\Kernel;
+use EXB\Kernel\Database;
 use EXB\Kernel\Document\AbstractDocument;
+use EXB\Kernel\Document\Event\ShowEvent;
+use EXB\Kernel\Document\Field\Field;
+use EXB\Kernel\Document\Field\FieldProxy;
+use EXB\Kernel\Document\Field\Proxy\DocumentField;
+use EXB\Kernel\Document\Field\Type\Images;
+use EXB\Kernel\Document\Field\Type\Label;
+use EXB\Kernel\Document\Model\Page\Page;
 use EXB\Kernel\Plugin\AbstractPlugin;
 use EXB\Kernel\Document\DocumentEvents;
 use EXB\Kernel\Document\Event\DocumentEvent;
@@ -48,7 +61,9 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 		return [
 			DocumentEvents::DOCUMENT_PRE_DELETE	=> ['onDelete', 0],
 			DocumentEvents::DOCUMENT_PRE_SAVE	=> ['onSave', 0],
-			'mobile_document_created' => ['onMobileSave', 0]
+			DocumentEvents::DOCUMENT_PRE_SHOW	=> ['onShow', 0],
+			'mobile_document_created' => ['onMobileSave', 0],
+			MailboxEvents::NEW_EMAIL => ['onMailReceived', 0]
 		];
 	}
 
@@ -66,6 +81,104 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	static function getTaskCategoryId()
 	{
 		return Config::get(static::$configBase . '.taskCategory', 112);
+	}
+
+	/**
+	 * Checks e-mails receive if it is an task e-mail.
+	 * When it is a task e-mail, we need to save the status as 'completed' and
+	 * check if all tasks in the questionaire have been completed. When all tasks
+	 * in the current quesionair have been completed we need to change the status of the parent questionaire
+	 *
+	 * @param MailEvent $event
+	 * @return void
+	 * @throws \Zend_Db_Exception
+	 */
+	public function onMailReceived(MailEvent $event) {
+		$document = $event->getEmail();
+
+		if ($document->getCategory()->getId() == self::getTaskCategoryId()) {
+			$statusId = Config::get(static::$configBase . '.task_completed_status', 157);
+			$tasksCompletedStatusId = Config::get(static::$configBase . '.all_task_completed_status', 158);
+
+			$document->setField('Status_ID', $statusId);
+			$document->save();
+
+			$ref = $document->getReferencesByClassname(
+				Incident::class,
+				\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
+			);
+
+			if (sizeof($ref) == 0) return;
+
+			$incident = $ref[0];
+			$tasks = $incident->getReferencesByClassname(
+				Incident::class,
+				Kernel\Document\Reference\Reference::DIRECTION_BOTH
+			);
+
+			$uncompletedTasks = 0;
+			/** @var Incident $task */
+			foreach($tasks as $task) {
+				if ($task->getField('Status_ID') != $statusId) {
+					$uncompletedTasks++;
+				}
+			}
+
+			if ($uncompletedTasks == 0) {
+				Kernel::getLogger()
+					->addInfo(self::$configBase . ': Received task reply ' . $uncompletedTasks . ' tasks remaining');
+				$incident->setField('Status_ID', $tasksCompletedStatusId);
+				$incident->save();
+			}
+		} else {
+			// ignore
+		}
+	}
+
+	public function onShow(ShowEvent $event) {
+		$document = $event->getDocument();
+		$model = $event->getDocument()->getModel();
+		$request = new Request;
+
+		if ($document->getCategory()->getId() != self::getTaskCategoryId()) return;
+
+		$proxy = new FieldProxy;
+		$proxy->get(function() use($document, $request) {
+			$db = Database::getInstance();
+
+			$ref = $document->getReferencesByClassname(
+				Incident::class,
+				\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
+			);
+
+			if (sizeof($ref) == 0) return [];
+
+			$incident = $ref[0];
+
+			$questionIdField = $document->getModel()->getFieldByAlias('qid');
+			$questionId = $questionIdField->getValue();
+
+			$sql = $db->select()->from('collab_mobileconnector_files', ['id'])
+				->where('bind = ?', $questionId)
+				->where('moduleid = ?', Modules::MODULE_INCIDENT)
+				->where('itemid = ?', $incident->getId());
+
+			$imageId = $db->fetchOne($sql);
+			if (!$imageId) return [];
+
+			return [
+				$request->getRootUrl() . "/public/products/qhse/index.php/plugin/r5.collaboration/connector?name=r5.im.mobileconnector&action=getPreview&id=" . $imageId
+			];
+		});
+
+		$field = new Field('dhmo_pcda_images', 'foto', new Images($proxy));
+		$field->setIsVariable(true);
+		$page = $model->getPage(0);
+		$page->addField($field);
+		$field->setOrder(0.1);
+		// Register on model. (This is a hack...)
+		$model->all_fields['dhmo_pcda_images'] = $field;
+
 	}
 
 	public function onDelete(DocumentEvent $event)

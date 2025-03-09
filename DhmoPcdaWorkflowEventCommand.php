@@ -46,7 +46,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 	}
 
 	public function handleEvent($event, Incident $document) {
-        $taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
+		$taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
 
 		switch ($event) {
 			// The existing task has been changed
