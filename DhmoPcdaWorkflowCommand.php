@@ -318,6 +318,8 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
 
 
                 // Set general fields
+                $statusId = Config::get(static::$configBase . '.task_registered_status', 3);
+                $task->setField('Status_ID', $statusId);
                 $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
                 $task->setField('Ingevoerd_door', \EXB\User::getCurrent()->getProductUser('IM')->getId());
                 $targetUser = $this->getTaskReportedByUserId($plan['station'], $plan['value']['Role']);
