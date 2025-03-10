@@ -23,6 +23,7 @@ use EXB\IM\Bridge\User\AnonymouseUser;
 use EXB\Kernel;
 use EXB\Kernel\Database;
 use EXB\Kernel\Document\Factory;
+use EXB\Kernel\Message\Hub;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
 
@@ -98,7 +99,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 							$user = $main->getReportedBy();
 							$notification->setRecipient($user->getR4User());
-							$notification->send();
+							Hub::send($notification);
 
 							//  TODO This is handles by the onMailevent.
 							// // Update status
@@ -128,7 +129,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						]);
 
 					$notification->setRecipient($user);
-					$notification->send();
+					Hub::send($notification);
 
 					// 15 => department field
 					foreach ($document->getModel()->getFieldByAlias('Inform')->getValue() as $department) {
@@ -146,7 +147,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 								'subject' => $notification->getSubject()
 							]);
 						$notification->setRecipient($user);
-						$notification->send();
+						Hub::send($notification);
 					}
 					break;
 				}
@@ -157,7 +158,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setBody($template->getBody())
 						->setSubject($template->getSubject());
 					$notification->setRecipient($document->getReportedBy()->getR4User());
-					$notification->send();
+					Hub::send($notification);
 
 					break;
 				}
