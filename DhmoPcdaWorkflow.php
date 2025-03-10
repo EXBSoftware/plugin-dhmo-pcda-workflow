@@ -118,7 +118,6 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 			$task->setField('Status_ID', $statusId);
 			$task->save();
-			$task->performIndex();
 
 			// update the field without performing save request (speed)
 			$executedField = $task->getModel()->getFieldByAlias('date_executed');
@@ -140,6 +139,8 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 				];
 				$db->insert('cim_variabele_velden_entries', $data);
 			}
+
+			$task->performIndex();
 
 			$ref = $task->getReferencesByClassname(
 				Incident::class,
@@ -171,7 +172,6 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 				$incident->performIndex();
 			}
 		} else {
-			// ignore
 		}
 	}
 
