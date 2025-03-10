@@ -249,10 +249,6 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $task->setName($plan['value']['Task']);
                 $task->save();
 
-
-                // Add reference between the parent document and the source (question) of the reference
-                $task->addReference($plan['reference'], $plan['field']->getId());
-
                 // Meta data
                 Number::allocate($task);
                 $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
@@ -263,6 +259,8 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
 
                 // Connect the category to the task
                 // TODO add category field to the task model
+                // TODO Is this needed? Tasks are created as a child of the category (see document hierarchy)
+                //      You can easily do a $document->getParent() for the Category document
                 $categoryDocument = Factory::fetch(
                     Modules::MODULE_CATEGORY,
                     $plan['reference']->getCategory()->getId()
