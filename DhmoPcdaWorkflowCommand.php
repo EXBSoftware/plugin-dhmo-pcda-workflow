@@ -316,7 +316,6 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 // Allocate number
                 Number::allocate($task);
 
-
                 // Set general fields
                 $statusId = Config::get(static::$configBase . '.task_registered_status', 3);
                 $task->setField('Status_ID', $statusId);
@@ -347,6 +346,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                     [$task->getModel()->getFieldByAlias('qid')->getId(), $plan['field']->getId()],
                     [$task->getModel()->getFieldByAlias('TaskCat')->getId(), $plan['value']['TaskCat']],
                     [$task->getModel()->getFieldByAlias('Role')->getId(), $plan['value']['Role']],
+                    [$task->getModel()->getFieldByAlias('Task')->getId(), $plan['value']['Task']],
                     [$task->getModel()->getFieldByAlias('Inform')->getId(), $plan['value']['Inform']],
                 ];
 
