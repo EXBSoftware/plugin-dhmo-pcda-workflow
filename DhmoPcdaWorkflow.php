@@ -95,18 +95,19 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	 * @throws \Zend_Db_Exception
 	 */
 	public function onMailReceived(MailEvent $event) {
-		/** @var Email $document **/
-		$document = $event->getEmail();
+		/** @var Email $email **/
+		$email = $event->getEmail();
 
 		$task = Factory::fetch(
 			Modules::MODULE_INCIDENT,
-			$document->getField('incidentid')
+			$email->getField('incidentid')
 		);
 
 		Kernel::getLogger()->addInfo(static::$configBase . ': Received e-mail, checking if we need to process', [
-			'itemId' => $document->getId(),
-			'categoryId' => $document->getCategory()->getId(),
-			'taskCategoryId' => self::getTaskCategoryId()
+			'itemId' => $task->getId(),
+			'categoryId' => $task->getCategory()->getId(),
+			'task_target_categoryId' => self::getTaskCategoryId(),
+			'email_itemId' => $email->getId()
 		]);
 
 		if ($task->getCategory()->getId() == self::getTaskCategoryId()) {
