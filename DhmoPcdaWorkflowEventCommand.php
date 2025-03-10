@@ -86,10 +86,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 						if ($uncompletedCount == 0) {
 							$categoryTemplateIds = [
-								91 => 17,
-								92 => 18
+								'91' => 17,
+								'92' => 18
 							]; // 91 = HACCP, 92 = Kwaliteit
-							$templateId = $categoryTemplateIds[$document->getCategory()->getId()];
+							$templateId = $categoryTemplateIds[$main->getCategory()->getId()];
 							$template = new Template($main, $templateId);
 
 							$notification = new \EXB\IM\Bridge\Message\Format\Notification($main);
@@ -101,10 +101,9 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 							$notification->setRecipient($user->getR4User());
 							Hub::send($notification);
 
-							//  TODO This is handles by the onMailevent.
-							// // Update status
-							// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
-							// $main->save();
+							//  NOTE This is handles by the onMailevent?
+							$main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
+							$main->save();
 						}
 					}
 					break;
@@ -146,7 +145,9 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 								'email' => $user->getEmail(),
 								'subject' => $notification->getSubject()
 							]);
+
 						$notification->setRecipient($user);
+
 						Hub::send($notification);
 					}
 					break;
@@ -158,8 +159,8 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setBody($template->getBody())
 						->setSubject($template->getSubject());
 					$notification->setRecipient($document->getReportedBy()->getR4User());
-					Hub::send($notification);
 
+					Hub::send($notification);
 					break;
 				}
 
