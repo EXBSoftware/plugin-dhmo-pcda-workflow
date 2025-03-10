@@ -1,4 +1,5 @@
 <?php
+
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
@@ -10,6 +11,7 @@
  *
  * @author Emiel van Goor <e.goor@exb-software.com>
  */
+
 declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
@@ -19,12 +21,14 @@ use EXB\IM\Bridge\Modules;
 use EXB\IM\Bridge\Number;
 use EXB\Kernel;
 use EXB\Kernel\Database;
+use EXB\Kernel\Document\AbstractDocument;
 use EXB\Kernel\Document\Factory;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\Kernel\Queue\Command\CommandQueue;
 use EXB\R4\Config;
 use EXB\Kernel\Plugin\PluginManager;
 use EXB\Kernel\Document\Model\ModelAbstract;
+use \EXB\User;
 
 class DhmoPcdaWorkflowCommand extends AbstractCommand
 {
@@ -136,6 +140,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 if ($field['is_negative'] == false) continue;
 
                 $actionPlan[] = [
+                    'station' => $station,
                     'reference' => $document,
                     'field' => $document->getModel()->getField($field['id']),
                     'action' => self::ACTION_CREATE_TASK,
@@ -151,6 +156,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 if (sizeof($tasks) == 0 && $field['is_negative']) {
                     // Create new task
                     $actionPlan[] = [
+                        'station' => $station,
                         'reference' => $document,
                         'field' => $document->getModel()->getField($field['id']),
                         'action' => self::ACTION_CREATE_TASK,
@@ -214,6 +220,64 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         return $data;
     }
 
+    // Returns IM user id
+    private function getTaskReportedByUserId(AbstractDocument $station, $roleId) {
+        $model = $station->getModel();
+
+        $role = [
+            405 => 'operations',
+            404 => 'regiomanager',
+            403 => 'tankstation',
+        ];
+
+        if (in_array($roleId, $role) == false) {
+            Kernel::getLogger()->addInfo(DhmoPcdaWorkflow::$configBase. ': Unknown role id to report to', [$roleId]);
+            return -1;
+        }
+
+        switch($role[$roleId]) {
+            case 'operations':
+                return Config::get(DhmoPcdaWorkflow::$configBase.'.operations_userid', 322);
+                break;
+            case 'regiomanager':
+                $regionManagerField = $model->getFieldByAlias('regioman');
+                if ($regionManagerField) {
+
+                    $users = $regionManagerField->getType()->getProxy()->getData();
+                    if (!is_array($users)) $users = [$users];
+
+                    if (sizeof($users) == 0) {
+                        Kernel::getLogger()->addInfo(DhmoPcdaWorkflow::$configBase. ': No regio manager found while the station wants it');
+                        return -1;
+                    }
+
+                    $regioManager = new User($users[0]);
+
+                    return $regioManager->getProductUser('im')->getId();
+                }
+
+                break;
+            case 'tankstation':
+                $stationField = $model->getFieldByAlias('statuser');
+                if ($stationField) {
+                    $users = $stationField->getType()->getProxy()->getData();
+                    if (!is_array($users)) $users = [$users];
+
+                    if (sizeof($users) == 0) {
+                        Kernel::getLogger()->addInfo(DhmoPcdaWorkflow::$configBase. ': No station found while the station wants it');
+                        return -1;
+                    }
+
+                    $station = new User($users[0]);
+
+                    return $station->getProductUser('im')->getId();
+                }
+                break;
+            default:
+                return -1;
+        }
+    }
+
     // Execute the action plan to create/delete tasks
     private function executeActionPlan($actionPlan)
     {
@@ -232,7 +296,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
 
         \EXB\Kernel::getLogger()->addInfo('Performing actionplan with count', [sizeof($actionPlan)]);
 
-        foreach ($actionPlan as $index=>$plan) {
+        foreach ($actionPlan as $index => $plan) {
 
             if ($plan['action'] == self::ACTION_CREATE_TASK) {
                 /**
@@ -249,9 +313,19 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $task->setName($plan['value']['Task']);
                 $task->save();
 
-                // Meta data
+                // Allocate number
                 Number::allocate($task);
+
+
+                // Set general fields
                 $task->setField('report_date', (new \DateTime())->format(\DateTime::ATOM));
+                $task->setField('Ingevoerd_door', \EXB\User::getCurrent()->getProductUser('IM')->getId());
+                $targetUser = $this->getTaskReportedByUserId($plan['station'], $plan['value']['Role']);
+                if ($targetUser != -1) {
+                    $task->setField('Gemelddoor_ID', $targetUser); // IM Target user
+                }
+                $task->setField('Rubriek_id', $category->getId());
+
                 $task->save();
 
                 // Add reference between the parent document and the source (question) of the reference
