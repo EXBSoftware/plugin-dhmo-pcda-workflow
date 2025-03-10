@@ -52,12 +52,11 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 			// The existing task has been changed
 			case DhmoPcdaWorkflowEvents::TASK_UPDATE: {
 				$task = $document;
-				$refs = $task->getReferences();
 
-				$refs->filter(function($document) use($taskCategoryId) {
-					return $document->getModule()->getId() == Modules::MODULE_INCIDENT &&
-						$document->getCategory()->getId() != $taskCategoryId;
-				});
+				$refs = $task->getReferencesByClassname(
+					Incident::class,
+					\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
+				);
 
 				if (sizeof($refs) == 0) {
 					Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Could not determine main incident for task', ['itemId' => $document->getId()]);
@@ -67,14 +66,15 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 				/** @var Incident $main */
 				$main = $refs[0];
 
-				$tasks = $main->getReferences()->filter(function($document) use($taskCategoryId) {
-					return $document->getModule()->getId() == Modules::MODULE_INCIDENT && $document->getCategory()->getId() == $taskCategoryId;
-				});
+				$otherTasks = $main->getReferencesByClassname(
+					Incident::class,
+					Kernel\Document\Reference\Reference::DIRECTION_BOTH
+				);
 
-				$uncompletedCount = 0;
 				$completed_task_id  = Config::get(DhmoPcdaWorkflow::$configBase . '.completed_task_status_id', 157);
-				foreach ($tasks as $task) {
-					if ($task->getField('status_id') != $completed_task_id) {
+				$uncompletedCount = 0;
+				foreach ($otherTasks as $oTask) {
+					if ($oTask->getCategory()->getId() == $taskCategoryId && $oTask->getField('status_id') != $completed_task_id) {
 						$uncompletedCount++;
 					}
 				}
@@ -121,7 +121,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setSubject($template->getSubject());
 					$user = new AnonymouseUser();
 					$user->setEmail($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue());
-					$notification->setRecipient();
+					$notification->setRecipient($user);
 					$notification->send();
 				}
 				break;

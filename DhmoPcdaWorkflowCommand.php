@@ -1,5 +1,4 @@
 <?php
-
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
@@ -224,22 +223,11 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
     private function getTaskReportedByUserId(AbstractDocument $station, $roleId) {
         $model = $station->getModel();
 
-        $role = [
-            405 => 'operations',
-            404 => 'regiomanager',
-            403 => 'tankstation',
-        ];
-
-        if (in_array($roleId, $role) == false) {
-            Kernel::getLogger()->addInfo(DhmoPcdaWorkflow::$configBase. ': Unknown role id to report to', [$roleId]);
-            return -1;
-        }
-
-        switch($role[$roleId]) {
-            case 'operations':
+        switch($roleId) {
+            case '405': // Operations
                 return Config::get(DhmoPcdaWorkflow::$configBase.'.operations_userid', 322);
                 break;
-            case 'regiomanager':
+            case '404': // regio manager
                 $regionManagerField = $model->getFieldByAlias('regioman');
                 if ($regionManagerField) {
 
@@ -257,7 +245,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 }
 
                 break;
-            case 'tankstation':
+            case '403': // tankstation
                 $stationField = $model->getFieldByAlias('statuser');
                 if ($stationField) {
                     $users = $stationField->getType()->getProxy()->getData();
@@ -274,8 +262,10 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 }
                 break;
             default:
-                return -1;
+                Kernel::getLogger()->addInfo(DhmoPcdaWorkflow::$configBase. ': Unknown role id to report to', [$roleId]);
         }
+
+        return -1;
     }
 
     // Execute the action plan to create/delete tasks
