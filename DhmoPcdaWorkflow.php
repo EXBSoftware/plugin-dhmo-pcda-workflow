@@ -95,6 +95,8 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	 * @throws \Zend_Db_Exception
 	 */
 	public function onMailReceived(MailEvent $event) {
+		$db = Database::getInstance();
+
 		/** @var Email $email **/
 		$email = $event->getEmail();
 
@@ -116,6 +118,27 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 			$task->setField('Status_ID', $statusId);
 			$task->save();
+
+			// update the field without performing save request (speed)
+			$executedField = $task->getModel()->getFieldByAlias('date_executed');
+			if ($executedField) {
+				$fieldId = substr($executedField->getId(), 3);
+				Database::delete('cim_variabele_velden_entries', [
+					'klacht_id' => $task->getId(),
+					'veld_id' => $fieldId
+				]);
+
+				$executedDate = new \DateTime;
+				$data = [
+					'klacht_id' => $task->getId(),
+					'veld_id' => substr($fieldId, 3),
+					'i' => 0,
+					'waarde' => sprintf('%sT00:00:00', $executedDate->format('Y-m-d')),
+					'languageId' => 'nl',
+					'moduleId' => Modules::MODULE_INCIDENT
+				];
+				$db->insert('cim_variabele_velden_entries', $data);
+			}
 
 			$ref = $task->getReferencesByClassname(
 				Incident::class,
