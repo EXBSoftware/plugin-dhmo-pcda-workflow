@@ -19,6 +19,7 @@ use EXB\IM\Bridge\Email\Template;
 use EXB\IM\Bridge\Modules;
 use EXB\IM\Bridge\User\AnonymouseUser;
 use EXB\Kernel;
+use EXB\Kernel\Database;
 use EXB\Kernel\Document\Factory;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
@@ -46,6 +47,8 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 	}
 
 	public function handleEvent($event, Incident $document) {
+		$db = Database::getInstance();
+
 		$taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
 
 		switch ($event) {
@@ -53,18 +56,25 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 			case DhmoPcdaWorkflowEvents::TASK_UPDATE: {
 				$task = $document;
 
-				$refs = $task->getReferencesByClassname(
-					Incident::class,
-					\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
-				);
+				$sql = $db->select()->from('r5_references', ['targetId'])
+						   ->where('sourceId = ?', $task->getId())
+						   ->where('sourceModule = ?', $task->getModule()->getId())
+						   ->where('targetModule = ?', Modules::MODULE_INCIDENT);
+				$mainId = $db->fetchOne($sql);
+				$main = Factory::fetch(Modules::MODULE_INCIDENT, $mainId);
 
-				if (sizeof($refs) == 0) {
+				// $refs = $task->getReferencesByClassname(
+				// 	Incident::class,
+				// 	\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
+				// );
+
+				if ($main->exists() == false) {
 					Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Could not determine main incident for task', ['itemId' => $document->getId()]);
 					return;
 				}
 
 				/** @var Incident $main */
-				$main = $refs[0];
+				// $main = $refs[0];
 
 				$otherTasks = $main->getReferencesByClassname(
 					Incident::class,
@@ -96,9 +106,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 					$notification->setRecipient($user->getR4User());
 					$notification->send();
 
-					// Update status
-					$main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
-					$main->save();
+					//  TODO This is handles by the onMailevent.
+					// // Update status
+					// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
+					// $main->save();
 				}
 				break;
 			}
