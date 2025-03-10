@@ -118,6 +118,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 			$task->setField('Status_ID', $statusId);
 			$task->save();
+			$task->performIndex();
 
 			// update the field without performing save request (speed)
 			$executedField = $task->getModel()->getFieldByAlias('date_executed');
@@ -147,6 +148,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 			if (sizeof($ref) == 0) return;
 
+			/** @var Incident $incident **/
 			$incident = $ref[0];
 			$otherTasks = $incident->getReferencesByClassname(
 				Incident::class,
@@ -166,6 +168,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 					->addInfo(self::$configBase . ': Received task reply ' . $uncompletedTasks . ' tasks remaining');
 				$incident->setField('Status_ID', $tasksCompletedStatusId);
 				$incident->save();
+				$incident->performIndex();
 			}
 		} else {
 			// ignore
