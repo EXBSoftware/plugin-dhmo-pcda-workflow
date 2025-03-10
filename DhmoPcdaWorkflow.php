@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
 
 use EXB\Http\Request;
+use EXB\IM\Bridge\Documents\Email;
 use EXB\IM\Bridge\Documents\Incident;
 use EXB\IM\Bridge\Mailbox\Event\MailEvent;
 use EXB\IM\Bridge\Mailbox\MailboxEvents;
@@ -94,16 +95,28 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 	 * @throws \Zend_Db_Exception
 	 */
 	public function onMailReceived(MailEvent $event) {
+		/** @var Email $document **/
 		$document = $event->getEmail();
 
-		if ($document->getCategory()->getId() == self::getTaskCategoryId()) {
+		$task = Factory::fetch(
+			Modules::MODULE_INCIDENT,
+			$document->getField('incidentid')
+		);
+
+		Kernel::getLogger()->addInfo(static::$configBase . ': Received e-mail, checking if we need to process', [
+			'itemId' => $document->getId(),
+			'categoryId' => $document->getCategory()->getId(),
+			'taskCategoryId' => self::getTaskCategoryId()
+		]);
+
+		if ($task->getCategory()->getId() == self::getTaskCategoryId()) {
 			$statusId = Config::get(static::$configBase . '.task_completed_status', 157);
 			$tasksCompletedStatusId = Config::get(static::$configBase . '.all_task_completed_status', 158);
 
-			$document->setField('Status_ID', $statusId);
-			$document->save();
+			$task->setField('Status_ID', $statusId);
+			$task->save();
 
-			$ref = $document->getReferencesByClassname(
+			$ref = $task->getReferencesByClassname(
 				Incident::class,
 				\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
 			);
@@ -111,15 +124,15 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 			if (sizeof($ref) == 0) return;
 
 			$incident = $ref[0];
-			$tasks = $incident->getReferencesByClassname(
+			$otherTasks = $incident->getReferencesByClassname(
 				Incident::class,
 				Kernel\Document\Reference\Reference::DIRECTION_BOTH
 			);
 
 			$uncompletedTasks = 0;
-			/** @var Incident $task */
-			foreach($tasks as $task) {
-				if ($task->getField('Status_ID') != $statusId) {
+			/** @var Incident $otherTask */
+			foreach($otherTasks as $otherTask) {
+				if ($otherTask->getField('Status_ID') != $statusId) {
 					$uncompletedTasks++;
 				}
 			}
