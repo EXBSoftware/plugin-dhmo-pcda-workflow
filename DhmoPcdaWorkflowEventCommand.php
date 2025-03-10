@@ -1,4 +1,5 @@
 <?php
+
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
@@ -10,6 +11,7 @@
  *
  * @author Emiel van Goor <e.goor@exb-software.com>
  */
+
 declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
@@ -28,7 +30,8 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 {
 	public function process(array $message)
 	{
-		if (array_key_exists('event', $message) == false ||
+		if (
+			array_key_exists('event', $message) == false ||
 			array_key_exists('itemId', $message) == false
 		) {
 			Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Cannot process event, not enough parameters given', $message);
@@ -46,123 +49,132 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 		}
 	}
 
-	public function handleEvent($event, Incident $document) {
+	public function handleEvent($event, Incident $document)
+	{
 		$db = Database::getInstance();
 
 		$taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
 
 		switch ($event) {
-			// The existing task has been changed
+				// The existing task has been changed
 			case DhmoPcdaWorkflowEvents::TASK_UPDATE: {
-				$task = $document;
+					$task = $document;
 
-				$sql = $db->select()->from('r5_references', ['targetId'])
-						   ->where('sourceId = ?', $task->getId())
-						   ->where('sourceModule = ?', $task->getModule()->getId())
-						   ->where('targetModule = ?', Modules::MODULE_INCIDENT);
-				$mainId = $db->fetchOne($sql);
-				$main = Factory::fetch(Modules::MODULE_INCIDENT, $mainId);
+					$sql = $db->select()->from('r5_references', ['targetId'])
+						->where('sourceId = ?', $task->getId())
+						->where('sourceModule = ?', $task->getModule()->getId())
+						->where('targetModule = ?', Modules::MODULE_INCIDENT);
+					$mainId = $db->fetchOne($sql);
 
-				// $refs = $task->getReferencesByClassname(
-				// 	Incident::class,
-				// 	\EXB\Kernel\Document\Reference\Reference::DIRECTION_BOTH
-				// );
+					/** @var Incident $main */
+					$main = Factory::fetch(Modules::MODULE_INCIDENT, $mainId);
 
-				if ($main->exists() == false) {
-					Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Could not determine main incident for task', ['itemId' => $document->getId()]);
-					return;
-				}
+					if ($main->exists()) {
+						$otherTasks = $main->getReferencesByClassname(
+							Incident::class,
+							Kernel\Document\Reference\Reference::DIRECTION_BOTH
+						);
 
-				/** @var Incident $main */
-				// $main = $refs[0];
+						$completed_task_id  = Config::get(DhmoPcdaWorkflow::$configBase . '.completed_task_status_id', 157);
+						$uncompletedCount = 0;
+						foreach ($otherTasks as $oTask) {
+							if ($oTask->getCategory()->getId() == $taskCategoryId && $oTask->getField('status_id') != $completed_task_id) {
+								$uncompletedCount++;
+							}
+						}
 
-				$otherTasks = $main->getReferencesByClassname(
-					Incident::class,
-					Kernel\Document\Reference\Reference::DIRECTION_BOTH
-				);
+						if ($uncompletedCount == 0) {
+							$categoryTemplateIds = [
+								91 => 17,
+								92 => 18
+							]; // 91 = HACCP, 92 = Kwaliteit
+							$templateId = $categoryTemplateIds[$document->getCategory()->getId()];
+							$template = new Template($main, $templateId);
 
-				$completed_task_id  = Config::get(DhmoPcdaWorkflow::$configBase . '.completed_task_status_id', 157);
-				$uncompletedCount = 0;
-				foreach ($otherTasks as $oTask) {
-					if ($oTask->getCategory()->getId() == $taskCategoryId && $oTask->getField('status_id') != $completed_task_id) {
-						$uncompletedCount++;
+							$notification = new \EXB\IM\Bridge\Message\Format\Notification($main);
+							$notification
+								->setBody($template->getBody())
+								->setSubject($template->getSubject());
+
+							$user = $main->getReportedBy();
+							$notification->setRecipient($user->getR4User());
+							$notification->send();
+
+							//  TODO This is handles by the onMailevent.
+							// // Update status
+							// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
+							// $main->save();
+						}
 					}
+					break;
 				}
-
-				if ($uncompletedCount == 0) {
-					$categoryTemplateIds = [
-						91 => 17,
-						92 => 18
-					]; // 91 = HACCP, 92 = Kwaliteit
-					$templateId = $categoryTemplateIds[$document->getCategory()->getId()];
-					$template = new Template($main, $templateId);
-
-					$notification = new \EXB\IM\Bridge\Message\Format\Notification($main);
-					$notification
-						->setBody($template->getBody())
-						->setSubject($template->getSubject());
-
-					$user = $main->getReportedBy();
-					$notification->setRecipient($user->getR4User());
-					$notification->send();
-
-					//  TODO This is handles by the onMailevent.
-					// // Update status
-					// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
-					// $main->save();
-				}
-				break;
-			}
 			case DhmoPcdaWorkflowEvents::TASK_CREATED: {
-				// 14 => to emloyee
-				$template = new Template($document, 14);
-				$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
-				$notification
-					->setBody($template->getBody())
-					->setSubject($template->getSubject());
-				$notification->setRecipient($document->getReportedBy()->getR4User());
-				$notification->send();
+					Kernel::getLogger()
+						->addInfo(DhmoPcdaWorkflow::$configBase . ': Task created, sending emails');
 
-				// 15 => department field
-				foreach ($document->getModel()->getFieldByAlias('Inform')->getValue() as $department) {
-					$template = new Template($document, 15);
+					// 14 => to emloyee
+					$template = new Template($document, 14);
 					$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
 					$notification
 						->setBody($template->getBody())
 						->setSubject($template->getSubject());
-					$user = new AnonymouseUser();
-					$user->setEmail($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue());
+
+					$user = $document->getReportedBy()->getR4User();
+
+					Kernel::getLogger()
+						->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending employee (14) email', [
+							'email' => $user->getEmail(),
+							'subject' => $notification->getSubject()
+						]);
+
 					$notification->setRecipient($user);
 					$notification->send();
+
+					// 15 => department field
+					foreach ($document->getModel()->getFieldByAlias('Inform')->getValue() as $department) {
+						$template = new Template($document, 15);
+						$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
+						$notification
+							->setBody($template->getBody())
+							->setSubject($template->getSubject());
+						$user = new AnonymouseUser();
+						$user->setEmail($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue());
+
+						Kernel::getLogger()
+							->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending department (15) email', [
+								'email' => $user->getEmail(),
+								'subject' => $notification->getSubject()
+							]);
+						$notification->setRecipient($user);
+						$notification->send();
+					}
+					break;
 				}
-				break;
-			}
 			case DhmoPcdaWorkflowEvents::TASK_DELETED: {
-				$template = new Template($document, 20);
-				$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
-				$notification
-					->setBody($template->getBody())
-					->setSubject($template->getSubject());
-				$notification->setRecipient($document->getReportedBy()->getR4User());
-				$notification->send();
+					$template = new Template($document, 20);
+					$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
+					$notification
+						->setBody($template->getBody())
+						->setSubject($template->getSubject());
+					$notification->setRecipient($document->getReportedBy()->getR4User());
+					$notification->send();
 
-				break;
-			}
+					break;
+				}
 
-			case DhmoPcdaWorkflowEvents::DOCUMENT_CREATED:
-			{
-				break;
-			}
+			case DhmoPcdaWorkflowEvents::DOCUMENT_CREATED: {
+					break;
+				}
 			case DhmoPcdaWorkflowEvents::DOCUMENT_UPDATE: {
-				break;
-			}
+					break;
+				}
 			case DhmoPcdaWorkflowEvents::DOCUMENT_DELETED: {
-				break;
-			}
+					break;
+				}
 			default: {
-				Kernel::getLogger()
-					->addWarning(DhmoPcdaWorkflow::$configBase . ': Unknown event', ['event' => $event]);
-			}
+					Kernel::getLogger()
+						->addWarning(DhmoPcdaWorkflow::$configBase . ': Unknown event', ['event' => $event]);
+				}
 		}
 	}
 }

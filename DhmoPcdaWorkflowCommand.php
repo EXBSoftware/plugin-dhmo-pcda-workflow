@@ -303,6 +303,9 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                 $task->setName($plan['value']['Task']);
                 $task->save();
 
+                // Add reference between the parent document and the source (question) of the reference
+                $task->addReference($plan['reference']);
+
                 // Allocate number
                 Number::allocate($task);
 
@@ -319,8 +322,6 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
 
                 $task->save();
 
-                // Add reference between the parent document and the source (question) of the reference
-                $task->addReference($plan['reference']);
 
                 // Connect the category to the task
                 // TODO add category field to the task model
@@ -360,13 +361,13 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                     'Max_afhandel_datum' => $plan['value']['Leadtime']
                 ], $db->quoteInto('ID = ?', $task->getId()));
 
-                // Force direct index
-                $task->performIndex();
-
                 CommandQueue::do(DhmoPcdaWorkflowEventCommand::class, [
                     'event' => DhmoPcdaWorkflowEvents::TASK_CREATED,
                     'itemId' => $task->getId()
                 ]);
+
+                // Force direct index
+                $task->performIndex();
             } else if ($plan['action'] == self::ACTION_REMOVE_TASK) {
                 /** @var Incident $reference */
                 $reference = $plan['reference'];
