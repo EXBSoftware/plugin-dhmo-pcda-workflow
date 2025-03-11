@@ -26,10 +26,7 @@ use EXB\Kernel\Document\AbstractDocument;
 use EXB\Kernel\Document\Event\ShowEvent;
 use EXB\Kernel\Document\Field\Field;
 use EXB\Kernel\Document\Field\FieldProxy;
-use EXB\Kernel\Document\Field\Proxy\DocumentField;
 use EXB\Kernel\Document\Field\Type\Images;
-use EXB\Kernel\Document\Field\Type\Label;
-use EXB\Kernel\Document\Model\Page\Page;
 use EXB\Kernel\Plugin\AbstractPlugin;
 use EXB\Kernel\Document\DocumentEvents;
 use EXB\Kernel\Document\Event\DocumentEvent;
@@ -131,7 +128,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 				$executedDate = new \DateTime;
 				$data = [
 					'klacht_id' => $task->getId(),
-					'veld_id' => substr($fieldId, 3),
+					'veld_id' => $fieldId,
 					'i' => 0,
 					'waarde' => sprintf('%sT00:00:00', $executedDate->format('Y-m-d')),
 					'languageId' => 'nl',
