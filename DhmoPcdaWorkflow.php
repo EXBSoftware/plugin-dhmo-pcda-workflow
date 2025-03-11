@@ -119,7 +119,8 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 			// update the field without performing save request (speed)
 			$executedField = $task->getModel()->getFieldByAlias('date_executed');
 			if ($executedField) {
-				$fieldId = substr($executedField->getId(), 3);
+				$fieldId = $executedField->getId();
+				Kernel::getLogger()->addInfo('fieldid', [$fieldId] );
 				Database::delete('cim_variabele_velden_entries', [
 					'klacht_id' => $task->getId(),
 					'veld_id' => $fieldId
