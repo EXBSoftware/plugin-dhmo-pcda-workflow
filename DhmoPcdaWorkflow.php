@@ -120,7 +120,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 			$executedField = $task->getModel()->getFieldByAlias('date_executed');
 			if ($executedField) {
 				$fieldId = $executedField->getId();
-				Kernel::getLogger()->addInfo('fieldid', [$fieldId] );
+
 				Database::delete('cim_variabele_velden_entries', [
 					'klacht_id' => $task->getId(),
 					'veld_id' => $fieldId
@@ -131,7 +131,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 					'klacht_id' => $task->getId(),
 					'veld_id' => $fieldId,
 					'i' => 0,
-					'waarde' => sprintf('%sT00:00:00', $executedDate->format('Y-m-d')),
+					'waarde' => $executedDate->format('d-m-Y'),
 					'languageId' => 'nl',
 					'moduleId' => Modules::MODULE_INCIDENT
 				];
