@@ -188,7 +188,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         $db = Database::getInstance();
         $procedureTableId = Config::get(self::$configBase . '.procedure_tableid', 'table_62');
 
-        $fieldAliasses = ['TaskCat', 'Task', 'Role', 'Inform', 'Leadtime', 'Prio'];
+        $fieldAliasses = ['TaskCat', 'Task', 'Role', 'Inform', 'Leadtime', 'Prio', 'Instruct'];
 
         // Select the correct field prefix based on manned or unmanned
         $aliasPrefix = $is_manned ? 'm' : 'u';
@@ -340,6 +340,7 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
                     [$task->getModel()->getFieldByAlias('Task')->getId(), $plan['value']['Task']],
                     [$task->getModel()->getFieldByAlias('Inform')->getId(), $plan['value']['Inform']],
                     [$task->getModel()->getFieldByAlias('Prio')->getId(), $plan['value']['Prio']],
+                    [$task->getModel()->getFieldByAlias('Instruct')->getId(), $plan['value']['Instruct']],
                 ];
 
                 foreach ($values as $value) {
