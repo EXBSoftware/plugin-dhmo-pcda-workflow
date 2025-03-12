@@ -25,6 +25,7 @@ use EXB\Kernel\Database;
 use EXB\Kernel\Document\Factory;
 use EXB\Kernel\Environment;
 use EXB\Kernel\Message\Hub;
+use EXB\Kernel\Plugin\PluginManager;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
 
@@ -32,6 +33,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 {
 	public function process(array $message)
 	{
+		PluginManager::getPlugin('mobile')->disable();
 		if (
 			array_key_exists('event', $message) == false ||
 			array_key_exists('itemId', $message) == false
@@ -49,6 +51,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 		} else {
 			Kernel::getLogger()->addWarning(DhmoPcdaWorkflow::$configBase . ': Cannot process event, document not found', $message);
 		}
+		PluginManager::getPlugin('mobile')->enable();
 	}
 
 	public function handleEvent($event, Incident $document)
@@ -100,6 +103,8 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 							$user = $main->getReportedBy();
 							$notification->setRecipient($user->getR4User());
+
+							$notification->send();
 							Hub::send($notification);
 
 							//  NOTE This is handles by the onMailevent?
@@ -160,6 +165,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						]);
 
 					$notification->setRecipient($user);
+					$notification->send();
 					Hub::send($notification);
 
 					// 15 => department field
@@ -178,11 +184,13 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 							->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending department (15) email', [
 								'email' => $user->getEmail(),
 								'subject' => $notification->getSubject(),
-								'photos' => sizeof($notification->getAttachments())
+								'photos' => sizeof($notification->getAttachments()),
+								'fields' => json_encode($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue())
 							]);
 
 						$notification->setRecipient($user);
 
+						$notification->send();
 						Hub::send($notification);
 					}
 
@@ -201,6 +209,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setSubject($template->getSubject());
 					$notification->setRecipient($document->getReportedBy()->getR4User());
 
+					$notification->send();
 					Hub::send($notification);
 					break;
 				}
