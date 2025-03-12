@@ -133,7 +133,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 							file_put_contents($filename, $image['file']);
 
 							$images[] = [
-								'name' => sprintf('Foto - %d', $index),
+								'name' => sprintf('Foto - %d.png', ++$index),
 								'path' => $filename
 							];
 						}
