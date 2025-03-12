@@ -104,7 +104,6 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 							$user = $main->getReportedBy();
 							$notification->setRecipient($user->getR4User());
 
-							$notification->send();
 							Hub::send($notification);
 
 							//  NOTE This is handles by the onMailevent?
@@ -165,7 +164,6 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						]);
 
 					$notification->setRecipient($user);
-					$notification->send();
 					Hub::send($notification);
 
 					// 15 => department field
@@ -190,7 +188,6 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 						$notification->setRecipient($user);
 
-						$notification->send();
 						Hub::send($notification);
 					}
 
@@ -209,7 +206,6 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setSubject($template->getSubject());
 					$notification->setRecipient($document->getReportedBy()->getR4User());
 
-					$notification->send();
 					Hub::send($notification);
 					break;
 				}
