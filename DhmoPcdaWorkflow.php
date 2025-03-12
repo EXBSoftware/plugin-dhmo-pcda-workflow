@@ -164,7 +164,7 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 
 			if ($uncompletedTasks == 0) {
 				Kernel::getLogger()
-					->addInfo(self::$configBase . ': Received task reply ' . $uncompletedTasks . ' tasks remaining');
+					->addInfo(self::$configBase . ': All tasks have been completed, ' . $uncompletedTasks . ' tasks remaining. Setting status id of main incident');
 				$incident->setField('Status_ID', $tasksCompletedStatusId);
 				$incident->save();
 				$incident->performIndex();
