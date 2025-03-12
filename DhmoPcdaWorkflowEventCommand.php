@@ -23,6 +23,7 @@ use EXB\IM\Bridge\User\AnonymouseUser;
 use EXB\Kernel;
 use EXB\Kernel\Database;
 use EXB\Kernel\Document\Factory;
+use EXB\Kernel\Environment;
 use EXB\Kernel\Message\Hub;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
@@ -109,22 +110,53 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 					break;
 				}
 			case DhmoPcdaWorkflowEvents::TASK_CREATED: {
+					// Get main incident
+					$sql = $db->select()->from('r5_references', ['targetId'])
+						->where('sourceId = ?', $document->getId())
+						->where('sourceModule = ?', $document->getModule()->getId())
+						->where('targetModule = ?', Modules::MODULE_INCIDENT);
+					$mainId = $db->fetchOne($sql);
+					/** @var Incident $main */
+					$main = Factory::fetch(Modules::MODULE_INCIDENT, $mainId);
+
+					// Fetch fotos
+					$questionIdField = $document->getModel()->getFieldByAlias('qid');
+					$images = [];
+					if ($questionIdField) {
+						$questionId = $questionIdField->getValue();
+						$sql = $db->select()->from('collab_mobileconnector_files', ['id', 'file'])
+							->where('bind = ?', $questionId)
+							->where('moduleid = ?', Modules::MODULE_INCIDENT)
+							->where('itemid = ?', $main->getId());
+						foreach ($db->fetchAll($sql) as $index => $image) {
+							$filename = Environment::getTemporaryDirectory() . DIRECTORY_SEPARATOR . $image['id'];
+							file_put_contents($filename, $image['file']);
+
+							$images[] = [
+								'name' => sprintf('Foto - %d', $index),
+								'path' => $filename
+							];
+						}
+					}
+
 					Kernel::getLogger()
-						->addInfo(DhmoPcdaWorkflow::$configBase . ': Task created, sending emails');
+						->addInfo(DhmoPcdaWorkflow::$configBase . ': Task created, sending emails', ['photo_count' => sizeof($image)]);
 
 					// 14 => to emloyee
 					$template = new Template($document, 14);
 					$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
 					$notification
 						->setBody($template->getBody())
-						->setSubject($template->getSubject());
+						->setSubject($template->getSubject())
+						->addAttachments($images);
 
 					$user = $document->getReportedBy()->getR4User();
 
 					Kernel::getLogger()
 						->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending employee (14) email', [
 							'email' => $user->getEmail(),
-							'subject' => $notification->getSubject()
+							'subject' => $notification->getSubject(),
+							'photos' => sizeof($notification->getAttachments())
 						]);
 
 					$notification->setRecipient($user);
@@ -136,20 +168,29 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
 						$notification
 							->setBody($template->getBody())
-							->setSubject($template->getSubject());
+							->setSubject($template->getSubject())
+							->addAttachments($images);
+
 						$user = new AnonymouseUser();
 						$user->setEmail($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue());
 
 						Kernel::getLogger()
 							->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending department (15) email', [
 								'email' => $user->getEmail(),
-								'subject' => $notification->getSubject()
+								'subject' => $notification->getSubject(),
+								'photos' => sizeof($notification->getAttachments())
 							]);
 
 						$notification->setRecipient($user);
 
 						Hub::send($notification);
 					}
+
+					// Clear temporary images
+					foreach ($images as $image) {
+						if (is_file($image['path'])) unlink($image['path']);
+					}
+
 					break;
 				}
 			case DhmoPcdaWorkflowEvents::TASK_DELETED: {
