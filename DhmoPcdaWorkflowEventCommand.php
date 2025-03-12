@@ -96,7 +96,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 							$templateId = $categoryTemplateIds[$main->getCategory()->getId()];
 							$template = new Template($main, $templateId);
 
-							$notification = new \EXB\IM\Bridge\Message\Format\Notification($main);
+							$notification = new \EXB\Kernel\Message\Format\Email($main);
 							$notification
 								->setBody($template->getBody())
 								->setSubject($template->getSubject());
@@ -149,7 +149,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 					// 14 => to emloyee
 					$template = new Template($document, 14);
-					$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
+					$notification = new \EXB\Kernel\Message\Format\Email($document);
 					$notification
 						->setBody($template->getBody())
 						->setSubject($template->getSubject())
@@ -171,7 +171,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 					// 15 => department field
 					foreach ($document->getModel()->getFieldByAlias('Inform')->getValue() as $department) {
 						$template = new Template($document, 15);
-						$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
+						$notification = new \EXB\Kernel\Message\Format\Email($document);
 						$notification
 							->setBody($template->getBody())
 							->setSubject($template->getSubject())
@@ -203,7 +203,7 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 				}
 			case DhmoPcdaWorkflowEvents::TASK_DELETED: {
 					$template = new Template($document, 20);
-					$notification = new \EXB\IM\Bridge\Message\Format\Notification($document);
+					$notification = new \EXB\Kernel\Message\Format\Email($document);
 					$notification
 						->setBody($template->getBody())
 						->setSubject($template->getSubject());
