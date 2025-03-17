@@ -62,8 +62,8 @@ class DhmoPcdaWorkflowCommand extends AbstractCommand
         // check if we're interested in this category
         if (in_array($categoryId, DhmoPcdaWorkflow::getTargetCategories()) == false) {
             Kernel::getLogger()->addNotice(self::$configBase . ': We\'re not interested in categoryId ' . $categoryId);
+						return;
         }
-
 
         // Get station
         $stationField = $document->getModel()->getFieldByAlias('station');
