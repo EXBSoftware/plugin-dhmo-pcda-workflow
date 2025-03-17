@@ -1,5 +1,4 @@
 <?php
-
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
