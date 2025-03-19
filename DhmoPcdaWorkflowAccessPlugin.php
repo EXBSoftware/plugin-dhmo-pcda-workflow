@@ -161,12 +161,12 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 	 * @uses \EXB\Kernel\BI\PowerBI\Report\FilterBasic
 	 * @return array <IBasicFilter>
 	 */
-	public function __getDefaultFilter($user, $table = 'registrations', $column = 'incident_category')
+	public function getDefaultFilter($user, $table = 'registrations', $column = 'incident_category')
 	{
 		$allCategories = \EXB\IM\Bridge\Category::getAll();
 
 		foreach ($allCategories as $obj) {
-			if ($this->hasCategoryAccess($ExbUser, $obj)) {
+			if ($this->hasCategoryAccess($user, $obj)) {
 				$categoryNames[] = $obj->getName();
 			}
 		}
@@ -182,7 +182,7 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 	* @param $reportId (not used)
 	* @return Array of <IBasicFilter>
 	*/
-	public function __getPowerBIFilter($reportId): array
+	public function getPowerBIFilter($reportId): array
 	{
 		$filters = [];
 		$ExbUser = \EXB\User::getCurrent();
@@ -208,6 +208,9 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 				$filters[] = $filterPerStation->toArray();
 			}
 		} catch (\Exception $e) {
+			\EXB\Kernel::getLogger()->addWarning('Justin made booboo in the powerbi filter (DhmoPcdaWorkflowAccessPlugin)');
+			\EXB\Kernel::getLogger()->addException($e);
+
 			$filterOnFailure = $basicFilterPerStation->setValue('-1');
 			$filters[] = $filterOnFailure->toArray();
 		}
