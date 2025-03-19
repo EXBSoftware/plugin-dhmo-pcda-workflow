@@ -19,8 +19,10 @@ use Elastica\Query\Term;
 use Elastica\Query\Terms;
 use EXB\IM\Bridge\AccessInterface\Adapter\ServiceDesk;
 use EXB\IM\Bridge\Modules;
+use EXB\Kernel\Database;
 use EXB\User;
 use EXB\Kernel\Document\AbstractDocument;
+use EXB\Kernel\BI\PowerBI\Report\FilterBasic;
 
 class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 {
@@ -31,6 +33,8 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
             return true;
         }
 
+				$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
+
         $allowedModules = [
             Modules::MODULE_INCIDENT
         ];
@@ -39,8 +43,22 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
             return false;
         }
 
-        // Check for task access
-        if ($document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()) {
+				if ($is_gasstation) {
+					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
+
+					if (!$gasStationField) return parent::authorize($document, $mode, $user);
+
+					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
+
+					$stationField = $document->getModel()->getFieldByAlias('station');
+					if (!$stationField) return parent::authorize($document, $mode, $user);
+
+					// Are with the target gas station?
+					return $stationField->getIndex()->getIndexValue()['id'] == $gasStationId;
+				} else if (
+					$document->getModule()->getId() == Modules::MODULE_INCIDENT &&
+					$document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()
+				) {
             $recipient   = $document->getModel()->getField('receipient')->getValue();
             $monitoredBy = $document->getModel()->getField('monitoredby')->getValue();
 
@@ -61,19 +79,23 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
                     return true;
                 }
             }
-        }
-
-        return false;
+        } else {
+					return parent::authorize($document, $mode, $user);
+				}
     }
 
     public function getIndexFilter(): \Elastica\Query\AbstractQuery
     {
+			$db = Database::getInstance();
+
         $filter = new BoolQuery;
         $filter->addMust((new Term)->setTerm('_document.module', 'im'));
 
         // Logged in exb user
         $user = User::getCurrent();
         $pUser = $user->getProductUser('im');
+
+				$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
 
         if ($user == false) {
             $filter->addMust((new Term)->setTerm('_document.id', -1));
@@ -83,7 +105,41 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
         // When administrator, return everything
         if ($user->hasAdministratorRights() || $pUser->isAdministrator()) {
             return $filter;
-        } else {
+        } else if ($is_gasstation) {
+					// get location field ids id
+
+					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
+
+					if (!$gasStationField) return $filter;
+
+					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
+
+					// Filter on station field, each category has its own station field
+					$stationsFilter = new BoolQuery;
+
+					$sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
+						->where('alias = ?', 'station')
+						->where('moduleid = ?', Modules::MODULE_INCIDENT)
+						->where('deleted = ?', 'N');
+					foreach ($db->fetchAll($sql) as $row) {
+						$stationFilter = new BoolQuery;
+
+						// The category needs to be this
+            $stationFilter->addMust(
+							(new Term)->setTerm('category.id', $row['catid']));
+
+						// The station field should be this
+						$stationFilter->addMust(
+							(new Term)->setTerm(sprintf('var%d.id', $row['id']), $gasStationId));
+
+						$stationsFilter->addShould(
+							$stationFilter
+						);
+					}
+
+					return $stationsFilter;
+
+				} else {
             $accessFilter = new BoolQuery;
             $accessFilter->addMust(
                 (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
@@ -96,4 +152,65 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
             return $filter;
         }
     }
+
+
+
+	/**
+	 * Returns a filter based on categorie `access` according to IM AccessInterfaceAdapter
+	 * @uses \EXB\IM\Bridge\Category
+	 * @uses \EXB\Kernel\BI\PowerBI\Report\FilterBasic
+	 * @return array <IBasicFilter>
+	 */
+	public function __getDefaultFilter($user, $table = 'registrations', $column = 'incident_category')
+	{
+		$allCategories = \EXB\IM\Bridge\Category::getAll();
+
+		foreach ($allCategories as $obj) {
+			if ($this->hasCategoryAccess($ExbUser, $obj)) {
+				$categoryNames[] = $obj->getName();
+			}
+		}
+		$categoryFilter = (new FilterBasic())->setTarget($table, $column)->setOperator('In');
+		foreach ($categoryNames as $name) {
+			$categoryFilter->setValue($name);
+		}
+		return $categoryFilter->toArray();
+	}
+
+	/*
+	* Returns PowerBI Filters based upon user property and IM Category access
+	* @param $reportId (not used)
+	* @return Array of <IBasicFilter>
+	*/
+	public function __getPowerBIFilter($reportId): array
+	{
+		$filters = [];
+		$ExbUser = \EXB\User::getCurrent();
+
+		// Source of Gasstation filter per EXB user account
+		$userFieldAlias = 'stationtbl';
+
+		// PBI Report specific properties
+		$defaultHook = ['query' => 'Alle checks', 'column' => 'incident_category'];
+		$stationHook = ['query' => 'Stations', 'column' => 'itemid'];
+
+		$basicFilterPerStation = (new FilterBasic())->setTarget($stationHook['query'], $stationHook['column'])->setOperator('In');
+
+		try {
+			// Default EXB Incident management - Access to categories
+			//$filters[] = $this->getDefaultFilter($ExbUser,$defaultHook['query'],$defaultHook['column']);
+
+			// Gasstation account alias has 3 digit post fix, other account do not
+			if (preg_match('/\d{3}(.*)/', $ExbUser->getDisplayName())) {
+				$stationId = $ExbUser->getDocument()->getModel()->getFieldByAlias($userFieldAlias)->getIndex()->getIndexValue()['id'];
+				// stationId could be -1, but create filter anyway (expect no registations to be shown in the report)
+				$filterPerStation = $basicFilterPerStation->setValue($stationId);
+				$filters[] = $filterPerStation->toArray();
+			}
+		} catch (\Exception $e) {
+			$filterOnFailure = $basicFilterPerStation->setValue('-1');
+			$filters[] = $filterOnFailure->toArray();
+		}
+		return $filters;
+	}
 }
