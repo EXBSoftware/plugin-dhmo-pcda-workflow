@@ -43,19 +43,7 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
             return false;
         }
 
-				if ($is_gasstation) {
-					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
-
-					if (!$gasStationField) return parent::authorize($document, $mode, $user);
-
-					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
-
-					$stationField = $document->getModel()->getFieldByAlias('station');
-					if (!$stationField) return parent::authorize($document, $mode, $user);
-
-					// Are with the target gas station?
-					return $stationField->getIndex()->getIndexValue()['id'] == $gasStationId;
-				} else if (
+				if (
 					$document->getModule()->getId() == Modules::MODULE_INCIDENT &&
 					$document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()
 				) {
@@ -79,6 +67,18 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
                     return true;
                 }
             }
+						} else if ($is_gasstation) {
+					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
+
+					if (!$gasStationField) return parent::authorize($document, $mode, $user);
+
+					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
+
+					$stationField = $document->getModel()->getFieldByAlias('station');
+					if (!$stationField) return parent::authorize($document, $mode, $user);
+
+					// Are with the target gas station?
+					return $stationField->getIndex()->getIndexValue()['id'] == $gasStationId;
         } else {
 					return parent::authorize($document, $mode, $user);
 				}
