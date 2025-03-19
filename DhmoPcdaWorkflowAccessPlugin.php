@@ -117,10 +117,21 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 					// Filter on station field, each category has its own station field
 					$stationsFilter = new BoolQuery;
 
+
+            $accessFilter = new BoolQuery;
+            $accessFilter->addMust(
+                (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
+
+            $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
+            $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
+						$stationsFilter->addShould($accessFilter);
+
+
 					$sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
 						->where('alias = ?', 'station')
 						->where('moduleid = ?', Modules::MODULE_INCIDENT)
 						->where('deleted = ?', 'N');
+
 					foreach ($db->fetchAll($sql) as $row) {
 						$stationFilter = new BoolQuery;
 
