@@ -47,8 +47,12 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 					$document->getModule()->getId() == Modules::MODULE_INCIDENT &&
 					$document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()
 				) {
-            $recipient   = $document->getModel()->getField('receipient')->getValue();
-            $monitoredBy = $document->getModel()->getField('monitoredby')->getValue();
+                    $receipientField =$document->getModel()->getField('receipient');
+                    $monitoredByField = $document->getModel()->getField('monitoredby');
+                    if (!$receipientField || !$monitoredByField) return true;
+
+            $recipient   = $receipientField->getValue();
+            $monitoredBy = $monitoredByField->getValue();
 
             if (array_key_exists('id', $recipient)) {
                 if ($pUser->getId() == $recipient['id']) {
@@ -95,60 +99,76 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
         $user = User::getCurrent();
         $pUser = $user->getProductUser('im');
 
-				$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
+        $is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
 
         if ($user == false) {
-            $filter->addMust((new Term)->setTerm('_document.id', -1));
             return $filter;
         }
 
         // When administrator, return everything
-        if ($user->hasAdministratorRights() || $pUser->isAdministrator()) {
+        if (false && $pUser->isAdministrator()) {
             return $filter;
         } else if ($is_gasstation) {
-					// get location field ids id
+            // get location field ids id
 
-					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
+            $gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
 
-					if (!$gasStationField) return $filter;
+            if (!$gasStationField) return $filter;
 
-					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
+            $gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
 
-					// Filter on station field, each category has its own station field
-					$stationsFilter = new BoolQuery;
+            // Filter on station field, each category has its own station field
+            $stationsFilter = new BoolQuery;
+
+            // $accessFilter = new BoolQuery;
+            // $accessFilter->addMust(
+            //     (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
+
+            // $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
+            // $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
+
+            // $stationsFilter->addShould($accessFilter);
 
 
-            $accessFilter = new BoolQuery;
-            $accessFilter->addMust(
-                (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
-
-            $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
-            $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
-						$stationsFilter->addShould($accessFilter);
 
 
-					$sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
-						->where('alias = ?', 'station')
-						->where('moduleid = ?', Modules::MODULE_INCIDENT)
-						->where('deleted = ?', 'N');
 
-					foreach ($db->fetchAll($sql) as $row) {
-						$stationFilter = new BoolQuery;
+                $stationFilter = new BoolQuery;
 
-						// The category needs to be this
-            $stationFilter->addMust(
-							(new Term)->setTerm('category.id', $row['catid']));
+                // The category needs to be this
+                // $stationFilter->addMust(
+                //     (new Term)->setTerm('category.id', DhmoPcdaWorkflow::getTaskCategoryId()));
 
-						// The station field should be this
-						$stationFilter->addMust(
-							(new Term)->setTerm(sprintf('var%d.id', $row['id']), $gasStationId));
+                $stationFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
+                $stationFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
 
-						$stationsFilter->addShould(
-							$stationFilter
-						);
-					}
+                $stationsFilter->addShould($stationFilter);
 
-					return $stationsFilter;
+
+
+            $sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
+                ->where('alias = ?', 'station')
+                ->where('moduleid = ?', Modules::MODULE_INCIDENT)
+                ->where('deleted = ?', 'N')
+                ->where('catid != ?', DhmoPcdaWorkflow::getTaskCategoryId());
+
+            foreach ($db->fetchAll($sql) as $row) {
+                $stationFilter = new BoolQuery;
+
+                // The category needs to be this
+                $stationFilter->addMust(
+                    (new Term)->setTerm('category.id', $row['catid']));
+
+                // The station field should be this
+                $stationFilter->addMust(
+                    (new Term)->setTerm(sprintf('var%d.id', $row['id']), $gasStationId));
+
+                $stationsFilter->addShould(
+                    $stationFilter
+                );
+            }
+
+            return $stationsFilter;
 
 				} else {
             $accessFilter = new BoolQuery;
