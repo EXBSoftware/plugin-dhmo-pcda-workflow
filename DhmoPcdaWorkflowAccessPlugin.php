@@ -106,7 +106,7 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
         }
 
         // When administrator, return everything
-        if (false && $pUser->isAdministrator()) {
+        if ($pUser->isAdministrator()) {
             return $filter;
         } else if ($is_gasstation) {
             // get location field ids id
