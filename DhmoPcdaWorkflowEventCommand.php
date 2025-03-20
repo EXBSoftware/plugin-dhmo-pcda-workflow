@@ -27,6 +27,8 @@ use EXB\Kernel\Message\Hub;
 use EXB\Kernel\Plugin\PluginManager;
 use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
+use EXB\IM\Bridge\Webform\Output\Pdf;
+use EXB\IM\Bridge\Number;
 
 class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 {
@@ -55,6 +57,8 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 	public function handleEvent($event, Incident $document)
 	{
+		$add_pdf  = Config::get(DhmoPcdaWorkflow::$configBase . '.attach_pdf_emails', true);
+
 		$db = Database::getInstance();
 
 		$taskCategoryId = DhmoPcdaWorkflow::getTaskCategoryId();
@@ -102,6 +106,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 							$user = $main->getReportedBy();
 							$notification->setRecipient($user->getR4User());
+
+							if ($add_pdf) {
+								$notification->addAttachment((new Number($main))->get() . ".pdf", (new Pdf($main))->generate());
+							}
 
 							Hub::send($notification);
 
@@ -163,6 +171,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						]);
 
 					$notification->setRecipient($user);
+
+					if ($add_pdf) {
+						$notification->addAttachment((new Number($document))->get() . ".pdf", (new Pdf($document))->generate());
+					}
 					Hub::send($notification);
 
 					// 15 => department field
@@ -187,6 +199,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 						$notification->setRecipient($user);
 
+						if ($add_pdf) {
+							$notification->addAttachment((new Number($document))->get() . ".pdf", (new Pdf($document))->generate());
+						}
+
 						Hub::send($notification);
 					}
 
@@ -204,6 +220,10 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						->setBody($template->getBody())
 						->setSubject($template->getSubject());
 					$notification->setRecipient($document->getReportedBy()->getR4User());
+
+					if ($add_pdf) {
+						$notification->addAttachment((new Number($document))->get() . ".pdf", (new Pdf($document))->generate());
+					}
 
 					Hub::send($notification);
 					break;
