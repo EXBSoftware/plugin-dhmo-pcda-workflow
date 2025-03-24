@@ -114,9 +114,9 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 							Hub::send($notification);
 
-							//  NOTE This is handles by the onMailevent?
-							$main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
-							$main->save();
+							// //  NOTE This is handles by the onMailevent?
+							// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
+							// $main->save();
 						}
 					}
 					break;
