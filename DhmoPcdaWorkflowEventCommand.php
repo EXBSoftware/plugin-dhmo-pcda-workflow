@@ -29,6 +29,7 @@ use EXB\Kernel\Queue\AbstractCommand;
 use EXB\R4\Config;
 use EXB\IM\Bridge\Webform\Output\Pdf;
 use EXB\IM\Bridge\Number;
+use EXB\User\External;
 
 class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 {
@@ -175,36 +176,33 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 					if ($add_pdf) {
 						$notification->addAttachment((new Number($document))->get() . ".pdf", (new Pdf($document))->generate());
 					}
-					Hub::send($notification);
 
-					// 15 => department field
-					foreach ($document->getModel()->getFieldByAlias('Inform')->getValue() as $department) {
-						$template = new Template($document, 15);
-						$notification = new \EXB\Kernel\Message\Format\Email($document);
-						$notification
-							->setBody($template->getBody())
-							->setSubject($template->getSubject())
-							->addAttachments($images);
+					// Check for CC
+					$sql = $db->select()->from('cim_variabele_velden_entries', ['procedureId' => 'klacht_id'])
+						->where('veld_id = ?','3724')
+						->where('waarde = ?',  $document->getModel()->getField('var3740')->getValue());
+					$procedureId = $db->fetchOne($sql);
 
-						$user = new AnonymouseUser();
-						$user->setEmail($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue());
+					// Get the procedure
+					$document = Factory::fetch('table_62', $procedureId);
+					$model = $document->getModel();
 
-						Kernel::getLogger()
-							->addInfo(DhmoPcdaWorkflow::$configBase . ': Sending department (15) email', [
-								'email' => $user->getEmail(),
-								'subject' => $notification->getSubject(),
-								'photos' => sizeof($notification->getAttachments()),
-								'fields' => json_encode($department->getModel()->getFieldByAlias('depmail')->getIndex()->getValue())
-							]);
-
-						$notification->setRecipient($user);
-
-						if ($add_pdf) {
-							$notification->addAttachment((new Number($document))->get() . ".pdf", (new Pdf($document))->generate());
+					$cc_addition = [];
+					foreach(['mInform', 'uInform'] as $fieldName)  {
+						$field = $model->getFieldByAlias($fieldName);
+						foreach ($field->getValue() as $department) {
+							$value = $department->getModel()->getFieldByAlias('depmail')->getValue();
+							if (\EXB\Validation\Email::isValid($value)) {
+								$cc_addition[] = $value;
+							}
 						}
-
-						Hub::send($notification);
 					}
+
+					$notification->setExternalReceipients(array_map(function ($recipient) {
+						return new External($recipient, $recipient);
+					}, $cc_addition), \EXB\Kernel\Message\Message::TYPE_CC);
+
+					Hub::send($notification);
 
 					// Clear temporary images
 					foreach ($images as $image) {
