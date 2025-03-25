@@ -93,6 +93,9 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						}
 
 						if ($uncompletedCount == 0) {
+
+							if ($main->getField('status_id') != Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15)) {
+
 							$categoryTemplateIds = [
 								'91' => 17,
 								'92' => 18
@@ -114,9 +117,11 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 							Hub::send($notification);
 
-							// //  NOTE This is handles by the onMailevent?
-							// $main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
-							// $main->save();
+							}
+
+							//  NOTE This is handles by the onMailevent?
+							$main->setField('status_id', Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15));
+							$main->save();
 						}
 					}
 					break;
