@@ -1,4 +1,5 @@
 <?php
+
 /**
  * EXB R5 - Business suite
  * Copyright (C) EXB Software 2025 - All Rights Reserved
@@ -10,6 +11,7 @@
  *
  * @author Emiel van Goor <e.goor@exb-software.com>
  */
+
 declare(strict_types=1);
 
 namespace EXB\Plugin\Custom\DhmoPcdaWorkflow;
@@ -26,165 +28,147 @@ use EXB\Kernel\BI\PowerBI\Report\FilterBasic;
 
 class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 {
-    public function authorize(AbstractDocument $document, $mode, User\UserInterface $user)
-    {
-        $pUser = $user->getProductUser('im');
-        if ($user->hasAdministratorRights() || $pUser->isAdministrator()) {
-            return true;
-        }
+	public function authorize(AbstractDocument $document, $mode, User\UserInterface $user)
+	{
+		$pUser = $user->getProductUser('im');
+		if ($user->hasAdministratorRights() || $pUser->isAdministrator()) {
+			return true;
+		}
 
-				$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
+		$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
 
-        $allowedModules = [
-            Modules::MODULE_INCIDENT
-        ];
+		$allowedModules = [
+			Modules::MODULE_INCIDENT
+		];
 
-        if (in_array($document->getModule()->getId(), $allowedModules) == false) {
-            return false;
-        }
+		if (in_array($document->getModule()->getId(), $allowedModules) == false) {
+			return false;
+		}
 
-				if (
-					$document->getModule()->getId() == Modules::MODULE_INCIDENT &&
-					$document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()
-				) {
-                    $receipientField =$document->getModel()->getField('receipient');
-                    $monitoredByField = $document->getModel()->getField('monitoredby');
-                    if (!$receipientField || !$monitoredByField) return true;
+		if (
+			$document->getModule()->getId() == Modules::MODULE_INCIDENT &&
+			$document->getCategory()->getId() == DhmoPcdaWorkflow::getTaskCategoryId()
+		) {
+			$receipientField = $document->getModel()->getField('receipient');
+			$monitoredByField = $document->getModel()->getField('monitoredby');
+			if (!$receipientField || !$monitoredByField) return true;
 
-            $recipient   = $receipientField->getValue();
-            $monitoredBy = $monitoredByField->getValue();
+			$recipient   = $receipientField->getValue();
+			$monitoredBy = $monitoredByField->getValue();
 
-            if (array_key_exists('id', $recipient)) {
-                if ($pUser->getId() == $recipient['id']) {
-                    return true;
-                }
-            } elseif (array_key_exists('id', $monitoredBy)) {
-                if ($pUser->getId() == $monitoredBy['id']) {
-                    return true;
-                }
-            } elseif (array_key_exists(0, $recipient)) {
-                if (in_array($pUser->getId(), $recipient)) {
-                    return true;
-                }
-            } elseif (array_key_exists(0, $monitoredBy)) {
-                if (in_array($pUser->getId(), $monitoredBy)) {
-                    return true;
-                }
-            }
-						} else if ($is_gasstation) {
-					$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
-
-					if (!$gasStationField) return parent::authorize($document, $mode, $user);
-
-					$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
-
-					$stationField = $document->getModel()->getFieldByAlias('station');
-					if (!$stationField) return parent::authorize($document, $mode, $user);
-
-					// Are with the target gas station?
-					return $stationField->getIndex()->getIndexValue()['id'] == $gasStationId;
-        } else {
-					return parent::authorize($document, $mode, $user);
+			if (array_key_exists('id', $recipient)) {
+				if ($pUser->getId() == $recipient['id']) {
+					return true;
 				}
-    }
+			} elseif (array_key_exists('id', $monitoredBy)) {
+				if ($pUser->getId() == $monitoredBy['id']) {
+					return true;
+				}
+			} elseif (array_key_exists(0, $recipient)) {
+				if (in_array($pUser->getId(), $recipient)) {
+					return true;
+				}
+			} elseif (array_key_exists(0, $monitoredBy)) {
+				if (in_array($pUser->getId(), $monitoredBy)) {
+					return true;
+				}
+			}
+		} else if ($is_gasstation) {
+			$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
 
-    public function getIndexFilter(): \Elastica\Query\AbstractQuery
-    {
-			$db = Database::getInstance();
+			if (!$gasStationField) return parent::authorize($document, $mode, $user);
 
-        $filter = new BoolQuery;
-        $filter->addMust((new Term)->setTerm('_document.module', 'im'));
+			$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
 
-        // Logged in exb user
-        $user = User::getCurrent();
-        $pUser = $user->getProductUser('im');
+			$stationField = $document->getModel()->getFieldByAlias('station');
+			if (!$stationField) return parent::authorize($document, $mode, $user);
 
-        $is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
+			// Are with the target gas station?
+			return $stationField->getIndex()->getIndexValue()['id'] == $gasStationId;
+		} else {
+			return parent::authorize($document, $mode, $user);
+		}
+	}
 
-        if ($user == false) {
-            return $filter;
-        }
+	public function getIndexFilter(): \Elastica\Query\AbstractQuery
+	{
+		$db = Database::getInstance();
 
-        // When administrator, return everything
-        if ($pUser->isAdministrator()) {
-            return $filter;
-        } else if ($is_gasstation) {
-            // get location field ids id
+		$filter = new BoolQuery;
+		$filter->addMust((new Term)->setTerm('_document.module', 'im'));
 
-            $gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
+		// Logged in exb user
+		$user = User::getCurrent();
+		$pUser = $user->getProductUser('im');
 
-            if (!$gasStationField) return $filter;
+		$is_gasstation = $pUser->getRole()->getName() == 'Tankstation';
 
-            $gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
+		if ($user == false) {
+			return $filter;
+		}
 
-            // Filter on station field, each category has its own station field
-            $stationsFilter = new BoolQuery;
+		// When administrator, return everything
+		if ($pUser->isAdministrator()) {
+			return parent::getIndexFilter();
+		} else if ($is_gasstation) {
+			// get location field ids id
 
-            // $accessFilter = new BoolQuery;
-            // $accessFilter->addMust(
-            //     (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
+			$gasStationField = $user->getDocument()->getModel()->getFieldByAlias('stationtbl');
 
-            // $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
-            // $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
+			if (!$gasStationField) return $filter;
 
-            // $stationsFilter->addShould($accessFilter);
+			$gasStationId = $gasStationField->getIndex()->getIndexValue()['id'];
 
+			// Filter on station field, each category has its own station field
+			$stationsFilter = new BoolQuery;
 
+			$stationFilter = new BoolQuery;
 
+			$stationFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
+			$stationFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
 
+			$stationsFilter->addShould($stationFilter);
 
-                $stationFilter = new BoolQuery;
+			$sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
+				->where('alias = ?', 'station')
+				->where('moduleid = ?', Modules::MODULE_INCIDENT)
+				->where('deleted = ?', 'N')
+				->where('catid != ?', DhmoPcdaWorkflow::getTaskCategoryId());
 
-                // The category needs to be this
-                // $stationFilter->addMust(
-                //     (new Term)->setTerm('category.id', DhmoPcdaWorkflow::getTaskCategoryId()));
+			foreach ($db->fetchAll($sql) as $row) {
+				$stationFilter = new BoolQuery;
 
-                $stationFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
-                $stationFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
+				// The category needs to be this
+				$stationFilter->addMust(
+					(new Term)->setTerm('category.id', $row['catid'])
+				);
 
-                $stationsFilter->addShould($stationFilter);
+				// The station field should be this
+				$stationFilter->addMust(
+					(new Term)->setTerm(sprintf('var%d.id', $row['id']), $gasStationId)
+				);
 
+				$stationsFilter->addShould(
+					$stationFilter
+				);
+			}
 
+			return $stationsFilter;
+		} else {
+			return parent::getIndexFilter();
+			// $accessFilter = new BoolQuery;
+			// $accessFilter->addMust(
+			// 	(new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()])
+			// );
 
-            $sql = $db->select()->from('cim_variabele_velden', ['id', 'catid'])
-                ->where('alias = ?', 'station')
-                ->where('moduleid = ?', Modules::MODULE_INCIDENT)
-                ->where('deleted = ?', 'N')
-                ->where('catid != ?', DhmoPcdaWorkflow::getTaskCategoryId());
+			// $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
+			// $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
 
-            foreach ($db->fetchAll($sql) as $row) {
-                $stationFilter = new BoolQuery;
+			// $filter->addMust($accessFilter);
 
-                // The category needs to be this
-                $stationFilter->addMust(
-                    (new Term)->setTerm('category.id', $row['catid']));
-
-                // The station field should be this
-                $stationFilter->addMust(
-                    (new Term)->setTerm(sprintf('var%d.id', $row['id']), $gasStationId));
-
-                $stationsFilter->addShould(
-                    $stationFilter
-                );
-            }
-
-            return $stationsFilter;
-
-				} else {
-            $accessFilter = new BoolQuery;
-            $accessFilter->addMust(
-                (new Terms)->setTerms('category.id', [DhmoPcdaWorkflow::getTaskCategoryId()]));
-
-            $accessFilter->addShould((new Term)->setTerm('registeredby.id', $pUser->getId()));
-            $accessFilter->addShould((new Term)->setTerm('loggedinuser.id', $pUser->getId()));
-
-            $filter->addMust($accessFilter);
-
-            return $filter;
-        }
-    }
-
-
+			// return $filter;
+		}
+	}
 
 	/**
 	 * Returns a filter based on categorie `access` according to IM AccessInterfaceAdapter
