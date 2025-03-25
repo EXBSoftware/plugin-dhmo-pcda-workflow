@@ -94,29 +94,27 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 
 						if ($uncompletedCount == 0) {
 
-							if ($main->getField('status_id') != Config::get(DhmoPcdaWorkflow::$configBase . '.completed_status_id', 15)) {
+							if ($main->getField('status_id') != 3) {
+								$categoryTemplateIds = [
+									'91' => 17,
+									'92' => 18
+								]; // 91 = HACCP, 92 = Kwaliteit
+								$templateId = $categoryTemplateIds[$main->getCategory()->getId()];
+								$template = new Template($main, $templateId);
 
-							$categoryTemplateIds = [
-								'91' => 17,
-								'92' => 18
-							]; // 91 = HACCP, 92 = Kwaliteit
-							$templateId = $categoryTemplateIds[$main->getCategory()->getId()];
-							$template = new Template($main, $templateId);
+								$notification = new \EXB\Kernel\Message\Format\Email($main);
+								$notification
+									->setBody($template->getBody())
+									->setSubject($template->getSubject());
 
-							$notification = new \EXB\Kernel\Message\Format\Email($main);
-							$notification
-								->setBody($template->getBody())
-								->setSubject($template->getSubject());
+								$user = $main->getReportedBy();
+								$notification->setRecipient($user->getR4User());
 
-							$user = $main->getReportedBy();
-							$notification->setRecipient($user->getR4User());
+								if ($add_pdf) {
+									$notification->addAttachment((new Number($main))->get() . ".pdf", (new Pdf($main))->generate());
+								}
 
-							if ($add_pdf) {
-								$notification->addAttachment((new Number($main))->get() . ".pdf", (new Pdf($main))->generate());
-							}
-
-							Hub::send($notification);
-
+								Hub::send($notification);
 							}
 
 							//  NOTE This is handles by the onMailevent?
