@@ -201,12 +201,13 @@ class DhmoPcdaWorkflow extends AbstractPlugin
 				->where('moduleid = ?', Modules::MODULE_INCIDENT)
 				->where('itemid = ?', $incident->getId());
 
-			$imageId = $db->fetchOne($sql);
-			if (!$imageId) return [];
+			$images = $db->fetchAll($sql);
 
-			return [
-				$request->getRootUrl() . "/public/products/qhse/index.php/plugin/r5.collaboration/connector?name=r5.im.mobileconnector&action=getPreview&id=" . $imageId
-			];
+			if (sizeof($images) == 0) return [];
+
+			return array_map(function ($image) use ($request) {
+					return $request->getRootUrl() . "/public/products/qhse/index.php/plugin/r5.collaboration/connector?name=r5.im.mobileconnector&action=getPreview&id=" . $image['id'];
+			}, $images);
 		});
 
 		$field = new Field('dhmo_pcda_images', 'foto', new Images($proxy));
