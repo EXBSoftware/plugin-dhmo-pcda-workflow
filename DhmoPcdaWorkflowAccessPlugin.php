@@ -219,7 +219,7 @@ class DhmoPcdaWorkflowAccessPlugin extends ServiceDesk
 			if (preg_match('/\d{3}(.*)/', $ExbUser->getDisplayName())) {
 				$stationId = $ExbUser->getDocument()->getModel()->getFieldByAlias($userFieldAlias)->getIndex()->getIndexValue()['id'];
 				// stationId could be -1, but create filter anyway (expect no registations to be shown in the report)
-				$filterPerStation = $basicFilterPerStation->setValue($stationId);
+				$filterPerStation = $basicFilterPerStation->setValue((int) $stationId);
 				$filters[] = $filterPerStation->toArray();
 			}
 		} catch (\Exception $e) {
