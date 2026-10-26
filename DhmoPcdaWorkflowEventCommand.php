@@ -154,8 +154,11 @@ class DhmoPcdaWorkflowEventCommand extends AbstractCommand
 						}
 					}
 
+					// $image is the loop variable above: a task whose question
+					// has no photos left it undefined, and sizeof() then threw
+					// before the employee and CC mails were sent.
 					Kernel::getLogger()
-						->addInfo(DhmoPcdaWorkflow::$configBase . ': Task created, sending emails', ['photo_count' => sizeof($image)]);
+						->addInfo(DhmoPcdaWorkflow::$configBase . ': Task created, sending emails', ['photo_count' => count($images)]);
 
 					// 14 => to emloyee
 					$template = new Template($document, 14);
